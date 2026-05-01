@@ -1,0 +1,13 @@
+#python
+__pycache__/
+*.py[cod]
+
+#Log file
+*.log
+
+# Flask
+instance/
+
+# IDE files
+.vscode/
+.idea/

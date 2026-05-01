@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Ziggy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Libre+Baskerville&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+  <div class="container">
+
+    <header>
+      <h1>Ziggy</h1>
+      <p class="subtitle">Generate UML Class Diagrams from Python Code</p>
+      <p class="tagline">Effortless visualization tool</p>
+    </header>
+
+    <form method="POST" enctype="multipart/form-data">
+
+      <!-- Upload -->
+      <div class="card">
+        <h2>Upload File</h2>
+
+        <div class="dropzone" id="dropzone">
+          Click or drop your <strong>.py</strong> file
+          <p class="hint">(Max 150KB)</p>
+        </div>
+
+        <input type="file" name="file" id="fileInput" accept=".py">
+        <p class="file-info" id="fileInfo"></p>
+      </div>
+
+      <!-- Button -->
+      <div class="card center">
+        <button type="submit" id="generateBtn" disabled>
+          Generate Diagram
+        </button>
+        <button type="button" id="clearBtn">
+          Clear
+        </button>
+      </div>
+
+    </form>
+    <!--Loading bar -->
+    <div class="progress-container hidden" id="progressContainer">
+      <div class="progress-bar indeterminate"></div>
+    </div>
+    <!-- Output -->
+    {% if class_diagram %}
+    <div class="card center" id="output">
+      <h2>Generated Diagram</h2>
+      <img src="{{ class_diagram }}" alt="UML Diagram" />
+      <br>
+      <a href="{{ class_diagram }}" download="diagram.png">Download Diagram</a>
+      <a href="{{ class_diagram }}" target="_blank">Preview Fullscreen</a>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="error-card">
+      {{ error }}
+    </div>
+    {% endif %}
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
