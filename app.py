@@ -84,7 +84,7 @@ def is_safe(source: str) -> tuple:
             elif isinstance(node.func, ast.Attribute):
                 attr = node.func.attr
                 if isinstance(node.func.value, ast.Name):
-                    module = node.func.attr
+                    module = node.func.value.id
                     if module in DANGER_ATTRS and attr in DANGER_ATTRS[module]:
                         logger.error(f"Dangerous call '{module}.{attr}' detected!")
                         return False, f" Dangerous call '{module}.{attr}' detected!"
