@@ -129,6 +129,11 @@ Uploaded files are checked against a blocklist of dangerous Python patterns befo
 
 ---
 
+## Test Report
+[View Test Report](https://deepak-g-d.github.io/Ziggy/test_report.html)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE) for details.
