@@ -1,13 +1,17 @@
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from typing import Any, Dict, List, Union
 
-visibility_Symbols: Dict[str, str] = {
+# -----------------------------
+# Symbols / Labels
+# -----------------------------
+
+VISIBILITY_SYMBOLS: Dict[str, str] = {
     "public": "+",
     "private": "-",
     "protected": "#"
 }
 
-relationship_Symbol: Dict[str, str] = {
+RELATIONSHIP_SYMBOLS: Dict[str, str] = {
     "composition": "*--",
     "association": "-->",
     "dependency": "..>",
@@ -15,7 +19,7 @@ relationship_Symbol: Dict[str, str] = {
     "inner_class": "+--"
 }
 
-relationship_Labels: Dict[str, str] = {
+RELATIONSHIP_LABELS: Dict[str, str] = {
     "composition": "has",
     "association": "uses",
     "dependency": "depends on",
@@ -23,118 +27,148 @@ relationship_Labels: Dict[str, str] = {
     "inner_class": "contains"
 }
 
+# -----------------------------
+# Helpers
+# -----------------------------
+
 def _format_parameters(params: List[Dict[str, Any]]) -> str:
-    """
-    Formats function/method parameters for PlantUML, excluding 'self'.
-    """
-    res: List[str] = []
+    """Format method parameters for PlantUML."""
+    formatted: List[str] = []
+
     for p in params:
-        if p["name"] == "self":
+        if p.get("name") == "self":
             continue
+
         if p.get("ann_type"):
-            res.append(f"{p['name']}: {p['ann_type']}")
+            formatted.append(f"{p['name']}: {p['ann_type']}")
         else:
-            res.append(p['name'])
-    return ", ".join(res)
+            formatted.append(p["name"])
 
-def _format_type_ann(type_: Any) -> str:
-    """
-    Formats a type annotation for PlantUML.
-    """
-    if type_:
-        return f": {type_}"
-    else:
-        return ""
+    return ", ".join(formatted)
 
-def _build_cls_bloc(cls: Dict[str, Any]) -> List[str]:
-    """
-    Builds the PlantUML block for a class, including attributes and methods.
-    """
+
+def _format_type(type_: Any) -> str:
+    """Format type annotation."""
+    return f": {type_}" if type_ else ""
+
+
+def _normalize_classes(classes: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure class objects are dicts (supports dataclasses or raw dicts)."""
+    normalized = {}
+
+    for k, v in classes.items():
+        if is_dataclass(v):
+            normalized[k] = asdict(v)
+        else:
+            normalized[k] = v
+
+    return normalized
+
+
+# -----------------------------
+# Class Block Builder
+# -----------------------------
+
+def _build_class_block(cls: Dict[str, Any]) -> List[str]:
     lines: List[str] = []
-    stereotype = ""
-    if cls.get("decorators"):
-        stereotype = f"<<{','.join(cls['decorators'])}>>"
 
-    header = f"class {cls['name']}"
-    if stereotype.strip():
-        header += f"{stereotype.strip()}"
+    # decorators → stereotype
+    decorators = cls.get("decorators", [])
+    stereotype = f"<<{','.join(decorators)}>>" if decorators else ""
+
+    header = f"class {cls['name']}{stereotype}"
     lines.append(header + " {")
 
-    # Docstring
+    # docstring
     if cls.get("docstring"):
         lines.append(f"  .. {cls['docstring']} ..")
 
-    # Class attributes
+    # class attributes
     for attr in cls.get("cls_attributes", {}).values():
-        vis = visibility_Symbols.get(attr.get("visibility", "public"), "+")
-        type_str = _format_type_ann(attr.get("type"))
-        lines.append(f"  {vis} {attr['name']}{type_str}")
+        vis = VISIBILITY_SYMBOLS.get(attr.get("visibility", "public"), "+")
+        lines.append(f"  {vis} {attr['name']}{_format_type(attr.get('type'))}")
 
-    # Instance attributes
+    # instance attributes
     for attr in cls.get("instance_attributes", {}).values():
-        vis = visibility_Symbols.get(attr.get("visibility", "public"), "+")
-        type_str = _format_type_ann(attr.get("type"))
-        lines.append(f"  {vis} {attr['name']}{type_str}")
+        vis = VISIBILITY_SYMBOLS.get(attr.get("visibility", "public"), "+")
+        lines.append(f"  {vis} {attr['name']}{_format_type(attr.get('type'))}")
 
-    # Methods
+    # methods
     for method in cls.get("methods", {}).values():
         if method["name"] == "__init__":
             continue
-        vis = visibility_Symbols.get(method.get("visibility", "public"), "+")
+
+        vis = VISIBILITY_SYMBOLS.get(method.get("visibility", "public"), "+")
         params = _format_parameters(method.get("parameters", []))
-        return_type = _format_type_ann(method.get("return_type"))
+        ret = _format_type(method.get("return_type"))
 
         decorators = method.get("decorators", [])
-        dec_str = f" <<{'|'.join(decorators)}>>" if decorators else ""
-        async_str = " {async}" if method.get("is_async") else ""
+        dec = f" <<{'|'.join(decorators)}>>" if decorators else ""
+        async_flag = " {async}" if method.get("is_async") else ""
 
-        lines.append(f"  {vis} {method['name']}({params}){return_type}{dec_str}{async_str}")
+        lines.append(
+            f"  {vis} {method['name']}({params}){ret}{dec}{async_flag}"
+        )
 
     lines.append("}")
     return lines
 
-def _generate_relationships(relationships: List[Dict[str, Any]]) -> List[str]:
-    """
-    Generates PlantUML lines for class relationships.
-    """
+
+# -----------------------------
+# Relationship Builder
+# -----------------------------
+
+def _build_relationships(relationships: List[Dict[str, Any]]) -> List[str]:
     lines: List[str] = []
+
     for rel in relationships:
-        symbol = relationship_Symbol.get(rel["rel_type"], "-->")
-        label = relationship_Labels.get(rel["rel_type"], "")
-        lines.append(f"{rel['from']} {symbol} {rel['to']} : {label}")
+        rel_type = rel.get("rel_type", "association")
+
+        symbol = RELATIONSHIP_SYMBOLS.get(rel_type, "-->")
+        label = RELATIONSHIP_LABELS.get(rel_type, "")
+
+        from_cls = rel["from"]
+        to_cls = rel["to"]
+
+        if label:
+            lines.append(f"{from_cls} {symbol} {to_cls} : {label}")
+        else:
+            lines.append(f"{from_cls} {symbol} {to_cls}")
+
     return lines
+
+
+# -----------------------------
+# Main Generator
+# -----------------------------
 
 def generate_plantuml(
     classes: Dict[str, Any],
     relationships: Union[List[Dict[str, Any]], Dict[str, Any]]
 ) -> str:
-    """
-    Generates a PlantUML class diagram from class and relationship metadata.
 
-    Args:
-        classes (Dict[str, Any]): Dictionary of class metadata.
-        relationships (List[Dict[str, Any]] or Dict[str, Any]): List or dict of relationship metadata.
-
-    Returns:
-        str: PlantUML diagram as a string.
-    """
-    # Convert relationships dict to list if needed
     if isinstance(relationships, dict):
         relationships = list(relationships.values())
 
-    classes = {k: asdict(v) for k, v in classes.items()}
+    classes = _normalize_classes(classes)
+
     lines: List[str] = ["@startuml"]
 
+    # classes
     for cls in classes.values():
-        lines.extend(_build_cls_bloc(cls))
+        lines.extend(_build_class_block(cls))
         lines.append("")
+
+        # inner classes (kept structural, not relationship-based)
         for inner in cls.get("inner_classes", []):
-            lines.extend(_build_cls_bloc(inner))
+            lines.extend(_build_class_block(inner))
             lines.append("")
 
+    # relationships
     if relationships:
-        lines.extend(_generate_relationships(relationships))
+        lines.extend(_build_relationships(relationships))
         lines.append("")
 
     lines.append("@enduml")
+
     return "\n".join(lines)
